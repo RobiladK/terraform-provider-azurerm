@@ -39,6 +39,7 @@ type SreAgentModel struct {
 	Location               string                                     `tfschema:"location"`
 	ActionConfiguration    []SreAgentActionConfiguration              `tfschema:"action_configuration"`
 	Identity               []identity.ModelSystemAssignedUserAssigned `tfschema:"identity"`
+	Networking             []SreAgentNetworking                       `tfschema:"networking"`
 	ResourcesConfiguration []SreAgentResourcesConfiguration           `tfschema:"resources_configuration"`
 	Tags                   map[string]string                          `tfschema:"tags"`
 	DefaultModel           []SreAgentDefaultModel                     `tfschema:"default_model"`
@@ -90,6 +91,7 @@ func (SreAgentResource) Arguments() map[string]*pluginsdk.Schema {
 		"resource_group_name": commonschema.ResourceGroupName(),
 		"location":            commonschema.Location(),
 		"identity":            commonschema.SystemAssignedUserAssignedIdentityRequired(),
+		"networking":          sreAgentNetworkingSchema(),
 		"action_configuration": {
 			Type: pluginsdk.TypeList, Optional: true, Computed: true, MaxItems: 1,
 			Elem: &pluginsdk.Resource{Schema: map[string]*pluginsdk.Schema{
@@ -276,6 +278,22 @@ func (SreAgentResource) CustomizeDiff() sdk.ResourceFunc {
 					return sreAgentBlockRemovalError(block)
 				}
 			}
+			if diff.NewValueKnown("networking") && (diff.Id() == "" || diff.HasChange("networking")) {
+				values := diff.Get("networking").([]interface{})
+				if len(values) == 0 {
+					oldValue, _ := diff.GetChange("networking")
+					if len(oldValue.([]interface{})) > 0 {
+						return sreAgentNetworkingRemovalError()
+					}
+				} else if diff.NewValueKnown("networking.0.egress_mode") && diff.NewValueKnown("networking.0.subnet_id") {
+					network := values[0].(map[string]interface{})
+					if err := validateSreAgentNetworking(SreAgentNetworking{
+						EgressMode: network["egress_mode"].(string), SubnetID: network["subnet_id"].(string),
+					}); err != nil {
+						return err
+					}
+				}
+			}
 			return nil
 		},
 	}
@@ -298,6 +316,8 @@ func (r SreAgentResource) expandCreate(config SreAgentModel) (agents.Agent, erro
 			return len(config.ActionConfiguration) > 0
 		case "resources_configuration":
 			return len(config.ResourcesConfiguration) > 0
+		case "networking":
+			return len(config.Networking) > 0
 		}
 		return false
 	})
@@ -309,6 +329,8 @@ func (r SreAgentResource) expandCreate(config SreAgentModel) (agents.Agent, erro
 		payload.Properties = &agents.AgentProperties{
 			ActionConfiguration:         patch.Properties.ActionConfiguration,
 			KnowledgeGraphConfiguration: patch.Properties.KnowledgeGraphConfiguration,
+			VnetConfiguration:           patch.Properties.VnetConfiguration,
+			SandboxConfiguration:        patch.Properties.SandboxConfiguration,
 		}
 	}
 	return payload, nil
@@ -363,6 +385,17 @@ func (SreAgentResource) expandPatch(config SreAgentModel, changed func(string) b
 			Identity: pointer.To(resources.IdentityID), ManagedResources: pointer.To(resources.ResourceIDs),
 		}
 	}
+	if changed("networking") {
+		if len(config.Networking) != 1 {
+			return payload, sreAgentNetworkingRemovalError()
+		}
+		if payload.Properties == nil {
+			payload.Properties = &agents.AgentPatchProperties{}
+		}
+		if err := expandSreAgentNetworking(config.Networking[0], payload.Properties); err != nil {
+			return payload, err
+		}
+	}
 	return payload, nil
 }
 
@@ -380,6 +413,12 @@ func (SreAgentResource) flatten(metadata sdk.ResourceMetaData, id *agents.AgentI
 	}
 	state.Identity = flattenedIdentity
 	if props := model.Properties; props != nil {
+		state.Networking = flattenSreAgentNetworking(props)
+		if len(state.Networking) > 0 {
+			if err := validateSreAgentNetworking(state.Networking[0]); err != nil {
+				metadata.Logger.Warnf("SRE Agent returned networking configuration this resource cannot configure; preserving returned state: %s", err)
+			}
+		}
 		state.Endpoint = pointer.From(props.AgentEndpoint)
 		state.PowerState = string(pointer.From(props.PowerState))
 		state.ProvisioningState = string(pointer.From(props.ProvisioningState))
