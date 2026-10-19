@@ -62,10 +62,10 @@ Set the Terraform list argument `include_resource = true` to include resource st
 
 Each result includes the agent name as its display name and a Terraform resource identity containing `subscription_id`, `resource_group_name`, and `name`.
 
-With `include_resource = true`, results use the same state mapping as [`azurerm_sre_agent`](/docs/providers/azurerm/r/sre_agent.html). This includes managed identities, action and resource configuration, tags, and computed attributes.
+With `include_resource = true`, results use the same state mapping as [`azurerm_sre_agent`](/docs/providers/azurerm/r/sre_agent.html). This includes managed identities, action and resource configuration, networking, tags, and computed attributes.
 
 Discovery leaves the agent and its permissions unchanged. Results preserve returned `ReadOnly` modes and empty resource scopes, although this resource cannot configure those values. Review generated configuration before applying it.
 
 Omitting an action or resource configuration block preserves its remote value, including when a dynamic block produces no instances. Empty-list assignments are unsupported nested-block syntax; there is no block-reset operation.
 
-The resource's other limitations also apply. VNet arguments and default-model setters are not implemented; AgentSpaces and connectors are outside this resource's scope.
+The resource's other limitations also apply. Default-model setters are not implemented; AgentSpaces and connectors are outside this resource's scope.

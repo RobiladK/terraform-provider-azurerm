@@ -39,6 +39,39 @@ resource "azurerm_sre_agent" "example" {
 }
 ```
 
+### Attach to an existing subnet
+
+Use a dedicated subnet in the agent's region, sized /27 or larger and delegated to `Microsoft.App/environments`.
+
+```hcl
+data "azurerm_subnet" "agent" {
+  name                 = "agent-subnet"
+  virtual_network_name = "existing-vnet"
+  resource_group_name  = "existing-network-rg"
+}
+
+resource "azurerm_resource_group" "agent" {
+  name     = "example-agent-rg"
+  location = "Sweden Central"
+}
+
+resource "azurerm_sre_agent" "example" {
+  name                = "example-sre-agent"
+  resource_group_name = azurerm_resource_group.agent.name
+  location            = azurerm_resource_group.agent.location
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  networking {
+    egress_mode = "AzureVNet"
+    subnet_id   = data.azurerm_subnet.agent.id
+  }
+}
+```
+
+The data source reads the existing network and does not take over its management. DNS links, routes, firewall rules and subnet capacity stay separately managed.
 ### Separate identities and an explicit resource scope
 
 This example assigns separate user-assigned managed identities to action and resource configuration. Each identity has an explicit `Reader` role assignment on the monitored resource group.
@@ -135,6 +168,8 @@ The following arguments are supported:
 
 * `resources_configuration` - (Optional, Computed) A `resources_configuration` block as defined below. When omitted, the provider reads the service value into state without changing it.
 
+* `networking` - (Optional, Computed) A `networking` block as defined below. Omitting the block preserves the remote settings.
+
 * `tags` - (Optional) A mapping of tags to assign to the SRE Agent.
 
 ---
@@ -165,9 +200,21 @@ A `resources_configuration` block supports the following:
 
 ~> **Note:** This resource requires all inner fields when either configuration block is supplied. The ARM API permits a broader set of configurations.
 
+---
+
+A `networking` block supports the following:
+
+* `egress_mode` - (Required) The outbound network mode. Possible values are `AzureVNet`, `Limited`, and `Unrestricted`.
+
+* `subnet_id` - (Optional) The resource ID of a dedicated subnet delegated to `Microsoft.App/environments`. Required when `egress_mode` is `AzureVNet` and must be omitted for the other modes.
+
+To attach a subnet, set `egress_mode = "AzureVNet"` and `subnet_id`. To detach, keep the block, set a non-VNet `egress_mode` such as `Limited`, and omit `subnet_id`. Setting `networking = []` is rejected at plan time.
+
 ## Known Limitations
 
-* This resource does not expose virtual network (VNet) arguments. The service does not allow `sandboxConfiguration` to be cleared once it is set, so this resource does not manage it.
+* VNet DNS, routes, firewall rules and subnet capacity are not managed by this resource.
+
+* The service does not allow `sandboxConfiguration` to be cleared once it is set, and a networking update sends only `sandboxConfiguration.egress`. Whether the service keeps other sandbox settings on that update has not been verified.
 
 * Removing an `action_configuration` or `resources_configuration` block leaves its remote value unchanged. The provider continues to read that value into state. A dynamic block with no instances has the same behavior.
 
