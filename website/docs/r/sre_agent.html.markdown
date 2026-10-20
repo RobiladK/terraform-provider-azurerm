@@ -179,7 +179,7 @@ A `resources_configuration` block supports the following:
 
 * `default_model` is computed-only. There is no model-selection setter. The endpoint and runtime status attributes are also computed-only.
 
-* AgentSpaces, connectors, and implicit RBAC assignments are outside this resource's scope.
+* AgentSpaces and implicit RBAC assignments are outside this resource's scope. Connectors are managed with `azurerm_sre_agent_connector`.
 
 * At least one managed identity must remain assigned. Before removing a user-assigned identity, update any action or resource configuration that references it. Identity updates remove the assignments omitted from the desired identity set.
 

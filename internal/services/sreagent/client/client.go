@@ -7,11 +7,13 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/go-azure-sdk/resource-manager/containerapps/2026-07-01/agents"
+	"github.com/hashicorp/go-azure-sdk/resource-manager/containerapps/2026-07-01/agentsconnectors"
 	"github.com/hashicorp/terraform-provider-azurerm/internal/common"
 )
 
 type Client struct {
-	Agents *agents.AgentsClient
+	Agents     *agents.AgentsClient
+	Connectors *agentsconnectors.AgentsConnectorsClient
 }
 
 func NewClient(o *common.ClientOptions) (*Client, error) {
@@ -20,5 +22,12 @@ func NewClient(o *common.ClientOptions) (*Client, error) {
 		return nil, fmt.Errorf("building Agents client: %+v", err)
 	}
 	o.Configure(client.Client, o.Authorizers.ResourceManager)
-	return &Client{Agents: client}, nil
+
+	connectors, err := agentsconnectors.NewAgentsConnectorsClientWithBaseURI(o.Environment.ResourceManager)
+	if err != nil {
+		return nil, fmt.Errorf("building Agents Connectors client: %+v", err)
+	}
+	o.Configure(connectors.Client, o.Authorizers.ResourceManager)
+
+	return &Client{Agents: client, Connectors: connectors}, nil
 }
