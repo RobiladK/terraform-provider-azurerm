@@ -29,7 +29,7 @@ func (Registration) WebsiteCategories() []string {
 }
 
 func (Registration) Resources() []sdk.Resource {
-	return []sdk.Resource{SreAgentResource{}}
+	return []sdk.Resource{SreAgentResource{}, SreAgentConnectorResource{}}
 }
 
 func (Registration) DataSources() []sdk.DataSource {
@@ -45,7 +45,7 @@ func (Registration) FrameworkDataSources() []sdk.FrameworkWrappedDataSource {
 }
 
 func (Registration) ListResources() []sdk.FrameworkListWrappedResource {
-	return []sdk.FrameworkListWrappedResource{SreAgentListResource{}}
+	return []sdk.FrameworkListWrappedResource{SreAgentListResource{}, SreAgentConnectorListResource{}}
 }
 
 func (Registration) Actions() []func() action.Action {
